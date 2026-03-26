@@ -1254,6 +1254,22 @@ textarea.fc{resize:vertical;min-height:76px;}
 // ══════════════════════════════════════════════════
 // DATA STORE
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// API CONFIG — connects to AWS backend
+// ══════════════════════════════════════════════════
+const API_BASE = 'http://3.108.40.109:3000';
+
+async function apiGet(endpoint) {
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`);
+    const data = await res.json();
+    return data.success ? data.data : [];
+  } catch (err) {
+    console.error('API error:', err);
+    return null;
+  }
+}
+
 let EMPS = [
   {id:'EMP001',name:'Arjun Sharma',dept:'Engineering',shift:'Morning',salary:65000,color:'#6366f1',desig:'Senior Engineer',status:'Active',phone:'+91 9876543210',email:'arjun@acme.com',join:'2022-03-15'},
   {id:'EMP002',name:'Priya Patel',dept:'Sales',shift:'Morning',salary:45000,color:'#ec4899',desig:'Sales Executive',status:'Active',phone:'+91 9876543211',email:'priya@acme.com',join:'2023-01-10'},
@@ -2922,12 +2938,31 @@ document.getElementById('sPwd2')?.addEventListener('input',function(){
 // ══════════════════════════════════════════════════
 // INIT (called by auth system after login)
 // ══════════════════════════════════════════════════
-function initApp() {
+async function initApp() {
+  const apiEmps = await apiGet('/api/employees');
+  if (apiEmps && apiEmps.length > 0) {
+    const colors = ['#6366f1','#ec4899','#f59e0b','#059669','#3b82f6','#7c3aed','#ea580c','#0d9488'];
+    EMPS = apiEmps.map((e, i) => ({
+      id: e.id || 'EMP' + String(i+1).padStart(3,'0'),
+      name: e.name,
+      dept: e.department || 'General',
+      shift: e.shift || 'Morning',
+      salary: e.salary || 45000,
+      color: colors[i % colors.length],
+      desig: e.role || 'Employee',
+      status: e.status || 'Active',
+      phone: e.phone || '—',
+      email: e.email || '',
+      join: e.join_date || '2024-01-01'
+    }));
+    toast('✅ Live data loaded from AWS!', 'success', 3000);
+  }
   renderDashboard();
-  document.getElementById('attDateF').value=todayStr();
-  document.getElementById('maDate').value=todayStr();
+  document.getElementById('attDateF').value = todayStr();
+  document.getElementById('maDate').value = todayStr();
   setEmpView('grid');
-  document.getElementById('maEmp').innerHTML=EMPS.map(e=>`<option value="${e.name}">${e.name} (${e.dept})</option>`).join('');
+  document.getElementById('maEmp').innerHTML = EMPS.map(e =>
+    `<option value="${e.name}">${e.name} (${e.dept})</option>`).join('');
 }
 </script>
 
