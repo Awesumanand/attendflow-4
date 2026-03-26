@@ -27,12 +27,12 @@ pipeline {
         }
 
         stage('Deploy') {
-            steps {
-                echo 'Deploying application...'
-                sh 'docker-compose down || true'
-                sh 'docker-compose up -d'
-            }
-        }
+    steps {
+        echo 'Deploying application...'
+        sh 'docker-compose down || true'
+        sh 'docker-compose up -d --build'
+    }
+}
 
     }
 
