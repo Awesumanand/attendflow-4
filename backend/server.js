@@ -10,6 +10,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// ✅ ADD THIS (ROOT ROUTE)
+app.get('/', (req, res) => {
+  res.json({
+    message: 'AttendFlow API is running!',
+    version: '1.0',
+    endpoints: [
+      '/api',
+      '/api/employees',
+      '/api/attendance',
+      '/api/dashboard'
+    ]
+  });
+});
+
 // GET /api — health check
 app.get('/api', (req, res) => {
   res.json({ message: 'AttendFlow API is running!', version: '1.0' });
@@ -34,6 +48,7 @@ app.get('/api/employees/:id', async (req, res) => {
     );
     if (result.rows.length === 0)
       return res.status(404).json({ success: false, message: 'Not found' });
+
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -44,17 +59,26 @@ app.get('/api/employees/:id', async (req, res) => {
 app.post('/api/employees', async (req, res) => {
   try {
     const { name, email, role, department } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name and email are required'
+      });
+    }
+
     const result = await db.query(
       'INSERT INTO employees (name, email, role, department) VALUES ($1,$2,$3,$4) RETURNING *',
       [name, email, role, department]
     );
+
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// GET /api/attendance — today's attendance
+// GET /api/attendance
 app.get('/api/attendance', async (req, res) => {
   try {
     const result = await db.query(`
@@ -63,13 +87,14 @@ app.get('/api/attendance', async (req, res) => {
       JOIN employees e ON a.employee_id = e.id
       ORDER BY a.punch_in DESC
     `);
+
     res.json({ success: true, data: result.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// GET /api/dashboard — summary stats
+// GET /api/dashboard
 app.get('/api/dashboard', async (req, res) => {
   try {
     const total   = await db.query('SELECT COUNT(*) FROM employees');
@@ -79,6 +104,7 @@ app.get('/api/dashboard', async (req, res) => {
     const leaves  = await db.query(
       "SELECT COUNT(*) FROM leaves WHERE status = 'pending'"
     );
+
     res.json({
       success: true,
       data: {

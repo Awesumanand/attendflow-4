@@ -27,12 +27,13 @@ pipeline {
         }
 
         stage('Deploy') {
-    steps {
-        echo 'Deploying application...'
-        sh 'docker-compose down || true'
-        sh 'docker-compose up -d --build'
-    }
-}
+            steps {
+                echo 'Deploying application...'
+                sh 'docker stop attendflow-backend-1 || true'
+                sh 'docker rm attendflow-backend-1 || true'
+                sh 'docker run -d --name attendflow-backend-1 -p 3000:3000 --env-file ./backend/.env attendflow-backend:latest'
+            }
+        }
 
     }
 
