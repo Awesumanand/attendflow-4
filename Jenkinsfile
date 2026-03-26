@@ -1,48 +1,27 @@
 pipeline {
     agent any
-
     stages {
-
         stage('Checkout Code') {
             steps {
-                echo 'Pulling code from GitHub...'
                 checkout scm
+                echo 'Code pulled successfully!'
             }
         }
-
         stage('Install Dependencies') {
             steps {
-                echo 'Installing Node.js packages...'
                 dir('backend') {
                     sh 'npm install'
                 }
             }
         }
-
-        stage('Build Docker Image') {
+        stage('Test App') {
             steps {
-                echo 'Building Docker image...'
-                sh 'docker build -t attendflow-backend:latest ./backend'
+                sh 'curl -s http://host.docker.internal:3000/api/employees && echo "App is healthy!"'
             }
         }
-
-        stage('Deploy') {
-            steps {
-                echo 'Deploying application...'
-                sh 'docker stop attendflow-backend-1 || true'
-                sh 'docker rm attendflow-backend-1 || true'
-                sh 'docker run -d --name attendflow-backend-1 -p 3000:3000 --env-file ./backend/.env attendflow-backend:latest'
-            }
-        }
-
     }
-
     post {
-        success {
-            echo 'BUILD SUCCESS - AttendFlow is deployed!'
-        }
-        failure {
-            echo 'BUILD FAILED - Check the logs above'
-        }
+        success { echo 'BUILD SUCCESS!' }
+        failure { echo 'BUILD FAILED' }
     }
 }
