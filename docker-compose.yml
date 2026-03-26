@@ -1,0 +1,47 @@
+# attendflow/docker-compose.yml
+
+version: '3.8'
+
+services:
+
+  # ── PostgreSQL Database ──
+  db:
+    image: postgres:15
+    container_name: attendflow_db
+    restart: always
+    environment:
+      POSTGRES_DB:       attendflow
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Node.js Backend ──
+  backend:
+    build: ./backend
+    container_name: attendflow_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT:      3000
+      DB_HOST:   db
+      DB_PORT:   5432
+      DB_NAME:   attendflow
+      DB_USER:   postgres
+      DB_PASS:   postgres123
+      JWT_SECRET: attendflow_super_secret_key_2026
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
