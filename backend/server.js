@@ -1,74 +1,97 @@
 // backend/server.js
-
 const express = require('express');
 const cors    = require('cors');
 require('dotenv').config();
 
+const db   = require('./db');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware — runs on every request
 app.use(cors());
 app.use(express.json());
-
-// ── TEMPORARY DATA (we replace this with DB later) ──
-const employees = [
-  { id:1, name:'Kunal Kumar',  role:'Developer',  dept:'Engineering', status:'present' },
-  { id:2, name:'SS',           role:'Designer',   dept:'Design',      status:'present' },
-  { id:3, name:'Awa Ad',       role:'HR',         dept:'HR',          status:'present' },
-  { id:4, name:'Anand Kumar',  role:'Manager',    dept:'Management',  status:'absent'  },
-];
-
-const attendance = [
-  { id:1, employee_id:1, name:'Kunal Kumar',  punch_in:'12:12 am', punch_out:'12:16 am', hours:'1h 51m', status:'late'    },
-  { id:2, employee_id:2, name:'SS',           punch_in:'02:57 pm', punch_out:'11:37 pm', hours:'0h 2m',  status:'present' },
-  { id:3, employee_id:3, name:'Awa Ad',       punch_in:'02:57 pm', punch_out:'03:00 pm', hours:'0h 2m',  status:'present' },
-  { id:4, employee_id:4, name:'Anand Kumar',  punch_in:'02:57 pm', punch_out:null,       hours:'0h 7m',  status:'present' },
-];
-
-// ── API ROUTES ──
 
 // GET /api — health check
 app.get('/api', (req, res) => {
   res.json({ message: 'AttendFlow API is running!', version: '1.0' });
 });
 
-// GET /api/employees — return all employees
-app.get('/api/employees', (req, res) => {
-  res.json({ success: true, data: employees });
+// GET /api/employees — all employees from DB
+app.get('/api/employees', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM employees ORDER BY id');
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-// GET /api/employees/:id — return one employee
-app.get('/api/employees/:id', (req, res) => {
-  const emp = employees.find(e => e.id === parseInt(req.params.id));
-  if (!emp) return res.status(404).json({ success: false, message: 'Employee not found' });
-  res.json({ success: true, data: emp });
+// GET /api/employees/:id — single employee
+app.get('/api/employees/:id', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM employees WHERE id = $1',
+      [req.params.id]
+    );
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'Not found' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-// GET /api/attendance — return today's attendance log
-app.get('/api/attendance', (req, res) => {
-  res.json({ success: true, data: attendance });
+// POST /api/employees — add new employee
+app.post('/api/employees', async (req, res) => {
+  try {
+    const { name, email, role, department } = req.body;
+    const result = await db.query(
+      'INSERT INTO employees (name, email, role, department) VALUES ($1,$2,$3,$4) RETURNING *',
+      [name, email, role, department]
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-// GET /api/dashboard — return dashboard stats
-app.get('/api/dashboard', (req, res) => {
-  const present = employees.filter(e => e.status === 'present').length;
-  const absent  = employees.filter(e => e.status === 'absent').length;
-  res.json({
-    success: true,
-    data: {
-      total_staff:    employees.length,
-      present_today:  present,
-      absent_today:   absent,
-      on_leave:       1,
-      late_arrivals:  3,
-      pending_leaves: 0,
-    }
-  });
+// GET /api/attendance — today's attendance
+app.get('/api/attendance', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT a.*, e.name, e.role, e.department
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.id
+      ORDER BY a.punch_in DESC
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-// START SERVER
+// GET /api/dashboard — summary stats
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    const total   = await db.query('SELECT COUNT(*) FROM employees');
+    const present = await db.query(
+      "SELECT COUNT(*) FROM attendance WHERE date = CURRENT_DATE AND status = 'present'"
+    );
+    const leaves  = await db.query(
+      "SELECT COUNT(*) FROM leaves WHERE status = 'pending'"
+    );
+    res.json({
+      success: true,
+      data: {
+        total_staff:    parseInt(total.rows[0].count),
+        present_today:  parseInt(present.rows[0].count),
+        pending_leaves: parseInt(leaves.rows[0].count),
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`AttendFlow server running at http://localhost:${PORT}`);
-  console.log(`Test it: http://localhost:${PORT}/api`);
 });
